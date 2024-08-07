@@ -20,6 +20,7 @@ const { validateOrder } = require("../utils/joi-validators")
 const { paymentIntialization } = require("../utils/payment-paystack");
 const {
     PAYMENT_CALLBACK_URL,
+    ORDER_PROCESSED_REDIRECTS,
 } = process.env;
 const macaddress = require('macaddress');
 const {getOne} = require("./generic-controller");
@@ -211,6 +212,8 @@ exports.processCart = catchAsync(async (req, res) => {
 exports.processOrder = catchAsync(async (req, res) => {
     const myconsole = new Econsole("checkout-controller.js", "processOrder", "")
     const userId = req.params.userId
+    const order = await Order.findOne({ userId }).populate('products.productId');
+
     //make entry in transaction log
     try {
         const transactionLog = new TransactionLog({
@@ -219,7 +222,6 @@ exports.processOrder = catchAsync(async (req, res) => {
         });
 
         await transactionLog.save();
-        const order = await Order.findOne({ userId }).populate('products.productId');
         order["paymentMethod"] = req.query.paymentMethod;
         order.save();
         const authHeader = req.headers['authorization'];
@@ -230,15 +232,15 @@ exports.processOrder = catchAsync(async (req, res) => {
         }
         res.set('authorizatoin', `Bearer ${token}`)
         const message = 'Order sucessfully processed awaiting delivery'
-        res.redirect(`https://shoes-jet.vercel.app/success?userId=${userId}&orderId=${order.id}`+
+        res.redirect(`${ORDER_PROCESSED_REDIRECTS}?userId=${userId}&orderId=${order.id}`+
             `&message=${message}`)
         //res.status(200).json({ message: 'Order sucessfully processed awaiting delivery', order: order });
     } catch (error) {
         console.error('Error saving transaction log:', error);
         //res.status(400).json({ message: `Order processing unsucessful, ${error}` });
         const message = `Order processing unsucessful ${error}`
-        res.redirect(`https://shoes-jet.vercel.app/success?userId=${userId}&orderId=${order.id}`+
-            `&message=${message}`)
+        res.redirect(`${ORDER_PROCESSED_REDIRECTS}?userId=${userId}&orderId=${order.id}`+
+            `&message=${message}`);
     }
     myconsole.log("exits")
 });
